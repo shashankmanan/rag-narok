@@ -1,2 +1,3 @@
 backend/venv/Lib
 backend/venv/Scripts
+__pycache__

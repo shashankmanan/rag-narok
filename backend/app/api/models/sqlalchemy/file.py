@@ -6,7 +6,7 @@ class Files(Base):
     __table_args__ = {
         'schema': 'public' ,
     }
-    id=Column(Integer,primary_key=True)
+    id=Column(Integer,primary_key=True,autoincrement=True)
     name=Column(String(255))
     s3key=Column(String(500))
     owner=Column(String(255))

@@ -1,10 +1,11 @@
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends,Request
 from fastapi.middleware.cors import CORSMiddleware
 from config import database
-from routes import test,file
+from routes import test,file,user
 import os
 from sqlalchemy import inspect
+from fastapi.responses import JSONResponse
 
 app = FastAPI(
     title="Document RAG API",
@@ -18,6 +19,17 @@ def init_db():
     inspector = inspect(database.engine)
     print("tables are: ",inspector.get_table_names())
 
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": getattr(exc, "detail", "An unexpected error occurred."),
+            "details": str(exc)
+
+        }
+    )
+
 app.add_middleware(CORSMiddleware,
         allow_origins=['*'],
         allow_credentials=True,
@@ -27,6 +39,7 @@ app.add_middleware(CORSMiddleware,
 
 app.include_router(test.router)
 app.include_router(file.router)
+app.include_router(user.router)
 
 @app.get("/" , tags=["test"])
 def greet():
