@@ -51,7 +51,7 @@ def login_user(login_data:UserLogin, db):
     return {
         "message": "Login successful",
         "access_token": token,
-        "user_id": user.id ,
+        "username": user.username ,
        
     }
 
