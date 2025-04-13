@@ -15,6 +15,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(login_data: UserLogin, db: Session = Depends(get_db)):
+    print(login_data)
     return login_user(login_data, db)
 
 

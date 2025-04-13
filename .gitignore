@@ -2,5 +2,5 @@ backend/venv/Lib
 backend/venv/Scripts
 __pycache__
 .env
-.env.local
-.env*.local
+backend/app/api/.env
+
