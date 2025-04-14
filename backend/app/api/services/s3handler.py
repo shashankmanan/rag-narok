@@ -37,5 +37,28 @@ class S3Handler:
                 detail=f"S3 Upload Error: {str(e)}"
             )
         finally:
-            file.file.close()
+             if hasattr(file, 'file') and not file.file.closed:
+                file.file.close()
+
+    def download_file_from_s3(self, s3_key: str) -> bytes:
+        """Downloads a file from S3 and returns its content as bytes."""
+        try:
+            response = self.s3.get_object(Bucket=self.bucket, Key=s3_key)
+            # Read the content from the streaming body
+            file_content = response['Body'].read()
+            return file_content
+        except self.s3.exceptions.NoSuchKey:
+            raise HTTPException(
+                status_code=404,
+                detail=f"File not found in S3 with key: {s3_key}"
+            )
+        except Exception as e:
+            # Catch other potential Boto3/S3 errors
+            raise HTTPException(
+                status_code=500,
+                detail=f"S3 Download Error: {str(e)}"
+            )
+
+
+   
 

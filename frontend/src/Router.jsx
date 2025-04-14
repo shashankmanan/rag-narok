@@ -6,6 +6,7 @@ import NavLayout from './layouts/NavLayout';
 import { useState,useEffect } from 'react';
 import ErrorPage from './pages/ErrorPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import FileView from './pages/FileView';
 
 export default function Router() {
   console.log("in router")
@@ -43,6 +44,7 @@ const ProtectedRoute = ()  => {
             <Route path="/dashboard" element={
                 <Dashboard />
             } />
+            <Route path="/view/:fileId" element={  <FileView /> } />
           </Route>
         </Route>  
          <Route path = "*" element={<ErrorPage/>}></Route>
