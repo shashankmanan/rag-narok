@@ -1,7 +1,7 @@
 import { HashRouter, Routes, Route, useNavigate,Outlet } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/auth/Login';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/Dashboard'
 import NavLayout from './layouts/NavLayout';
 import { useState,useEffect } from 'react';
 import ErrorPage from './pages/ErrorPage';
@@ -17,7 +17,7 @@ const ProtectedRoute = ()  => {
       navigate('/login', { replace: true });
   }, [navigate]);
   console.log("logged in")
-  return localStorage.getItem('ragnarok_token') ? <Outlet /> : null;
+  return <Outlet />;
 }
 
   return (
