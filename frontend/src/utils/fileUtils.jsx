@@ -85,37 +85,34 @@ export const parseFileById = async (owner, fileId) => {
 
     try {
         const response = await fetch(url, {
-            method: 'GET', // Changed from POST, assuming GET based on backend route definition
+            method: 'GET', 
             headers: {
                 'Accept': 'application/json',
-                // Add Authorization headers if required by your backend
-                // 'Authorization': `Bearer ${your_auth_token}`
             },
         });
 
-        // Check if response is OK (status in 200-299 range)
+
         if (!response.ok) {
-            // Try to parse error json from backend, otherwise use status text
+
             let errorData;
             try {
                  errorData = await response.json();
             } catch (e) {
-                 // Ignore if response body isn't valid JSON
+
             }
             console.error(`API Error ${response.status}:`, errorData || response.statusText);
-            // Return the error data structure from backend if available
+
             throw { status: response.status, data: errorData || { detail: response.statusText } };
         }
 
-        // If response is OK, parse the JSON body
+        
         const data = await response.json();
-        return data; // Return the parsed data (e.g., { message: "...", parsed_content_id: ..., ... })
+        return data; 
 
     } catch (error) {
         console.error('Network or parsing error in parseFileById:', error);
-        // Re-throw either the structured API error or a generic error
+        
         throw error.data ? error : new Error(error.message || 'Failed to fetch parsed content due to network error.');
     }
 };
 
-// --- Add deleteFile, downloadFile utilities as needed ---

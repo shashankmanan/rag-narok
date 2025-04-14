@@ -1,53 +1,93 @@
-# parse.py
+"""
+Document parsing and text processing module.
+
+This module provides functionality for extracting text from various document formats,
+chunking the text into manageable segments, and preparing it for embedding and retrieval.
+It uses the unstructured library for document parsing and the LangChain text splitter 
+for chunking text into semantically meaningful segments.
+"""
 from unstructured.partition.auto import partition
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-# LlamaIndex VectorStoreIndex might not be needed if just storing vectors
-# from llama_index.core import VectorStoreIndex, Document
 from langchain.embeddings import HuggingFaceEmbeddings
 from fastapi import UploadFile
 from io import BytesIO
-import logging # Optional: Add logging for better debugging
+import logging 
 
-# Setup basic logging
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Step 1: Parse the file's content from bytes directly
+
 async def parse_document(file_content: bytes, content_type: str) -> str:
-    """Extract raw text from file bytes"""
+    """
+    Extract raw text from file bytes using the unstructured library.
+    
+    This function handles various document formats (PDF, DOCX, TXT, etc.)
+    and extracts their textual content for further processing.
+    
+    Args:
+        file_content: Binary content of the uploaded file
+        content_type: MIME type of the file (e.g., 'application/pdf')
+        
+    Returns:
+        Extracted text as a string
+        
+    Raises:
+        Exception: If document parsing fails
+    """
     logger.info(f"Parsing document with content_type: {content_type}")
-    # Using BytesIO to mimic file object from byte content
+    
     try:
         with BytesIO(file_content) as buffer:
-            # Pass content_type to help unstructured choose the right parser
+            # Use unstructured library to extract elements from the document
             elements = partition(file=buffer, content_type=content_type)
-        # Ensure elements are converted to string; handle potential non-string elements if any
+       
+        # Join all extracted elements into a single text string
         raw_text = "\n".join([str(el) for el in elements if el is not None])
         logger.info(f"Successfully parsed {len(raw_text)} characters.")
         return raw_text
     except Exception as e:
         logger.error(f"Error during document parsing: {e}", exc_info=True)
-        raise # Re-raise the exception to be handled by the caller
+        raise 
 
-# Step 2: Split the text into chunks
+
 def chunk_text(text: str) -> list[str]:
-    """Split text into chunks for NLP processing"""
-    if not text: # Handle empty input text
+    """
+    Split text into smaller chunks for more effective embedding and retrieval.
+    
+    Uses LangChain's RecursiveCharacterTextSplitter to divide text into chunks
+    that preserve semantic meaning while staying within size limits optimal
+    for embedding models.
+    
+    Args:
+        text: The raw text to be chunked
+        
+    Returns:
+        List of text chunks
+    """
+    if not text: 
         logger.info("Input text is empty, returning empty list of chunks.")
         return []
+    
     logger.info(f"Chunking text of length {len(text)}")
+    
+    # Configure the text splitter with appropriate chunk size and overlap
+    # Chunk size of 512 is chosen to balance context preservation and embedding model limits
+    # Overlap of 50 ensures continuity between chunks
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=512,
         chunk_overlap=50,
-        length_function=len, # Explicitly use len
-        add_start_index = False # Often not needed unless tracking source positions
+        length_function=len,
+        add_start_index = False
     )
+    
+    # Split the text into chunks
     chunks = splitter.split_text(text)
     logger.info(f"Created {len(chunks)} chunks.")
     return chunks
 
-# Step 3: Create an in-memory vector index (Now primarily used in parser_main)
-# Kept for reference or potential future use
+
+# Commented out unused function, preserved for reference or future use
 #def create_vector_index(text_chunks: list[str]):
 #    """Generate an in-memory vector index (optional, for semantic search)"""
 #    if not text_chunks:
@@ -61,23 +101,41 @@ def chunk_text(text: str) -> list[str]:
 #    logger.info("Vector index created successfully.")
 #    return index
 
-# Step 4: Complete processing pipeline for UPLOAD scenario: parse → chunk → embed
+
 async def parser_main(file: UploadFile) -> dict:
-    """Complete processing pipeline for parsing, chunking, and embedding from UploadFile"""
+    """
+    Complete processing pipeline for parsing, chunking, and embedding document content.
+    
+    This function orchestrates the full document processing workflow:
+    1. Read the uploaded file
+    2. Extract text from the document
+    3. Chunk the text into smaller segments
+    4. Generate vector embeddings for each chunk
+    5. Return the processed data
+    
+    Args:
+        file: The uploaded file from FastAPI
+        
+    Returns:
+        Dictionary containing raw text, chunks, vectors, and processing statistics
+        
+    Raises:
+        HTTPException: If processing fails at any stage
+    """
     logger.info(f"Starting parser_main for file: {file.filename}, type: {file.content_type}")
     try:
-        # Read ALL content FIRST and convert to bytes
+        # Step 1: Read file content
         file_content = await file.read()
         logger.info(f"Read {len(file_content)} bytes from uploaded file.")
 
         if not file_content:
             logger.warning("Uploaded file content is empty.")
-            # Return structure consistent with success but with empty/zero values
+            
             return {
                 "raw_text": "",
                 "chunks": [],
                 "vectors": [],
-                "index": None, # Or appropriate representation for no index
+                "index": None, 
                 "stats": {
                     "char_count": 0,
                     "chunk_count": 0,
@@ -85,36 +143,31 @@ async def parser_main(file: UploadFile) -> dict:
                 }
             }
 
-        # Step 1: Parse raw text (pass bytes directly)
+        # Step 2: Extract text from document
         raw_text = await parse_document(file_content, file.content_type)
         logger.info(f"Extracted {len(raw_text)} characters")
 
-        # Step 2: Chunk text
+        # Step 3: Split text into chunks
         chunks = chunk_text(raw_text)
         logger.info(f"Created {len(chunks)} chunks")
 
-        # Step 3: Generate embeddings
+        # Step 4: Generate vector embeddings for each chunk
         vectors = []
-        if chunks: # Only generate embeddings if there are chunks
+        if chunks: 
+             # Use HuggingFace embedding model to generate vector representations
              embedder = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
              vectors = embedder.embed_documents(chunks)  # List[List[float]]
              logger.info(f"Generated {len(vectors)} vectors.")
         else:
              logger.info("No chunks generated, skipping vector embedding.")
 
-
-        # Optional: create in-memory vector index for search (might be resource-intensive)
-        # index = create_vector_index(chunks) if chunks else None
-        # if index:
-        #    logger.info("In-memory vector index created (not returned by default).")
-        index = None # Keep it simple for now unless index is needed in the response
+        # Step 5: Return processed data with statistics
+        index = None 
 
         return {
             "raw_text": raw_text,
-            # Return chunks as simple list of strings, as expected by DB usually
             "chunks": chunks,
             "vectors": vectors,
-            # "index": index, # Typically don't return large index objects in API responses
             "stats": {
                 "char_count": len(raw_text),
                 "chunk_count": len(chunks),
@@ -124,8 +177,7 @@ async def parser_main(file: UploadFile) -> dict:
 
     except Exception as e:
         logger.error(f"Processing failed in parser_main for file {file.filename}: {str(e)}", exc_info=True)
-        # Re-raise the exception to be caught by FastAPI error handling
+        
+        # Rethrow as HTTPException to be caught by FastAPI's exception handlers
         raise HTTPException(status_code=500, detail=f"Failed to process file: {str(e)}")
-    # finally:
-        # FastAPI handles closing the UploadFile automatically when the request context ends.
-        # No explicit close needed here for file.
+  
