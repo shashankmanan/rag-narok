@@ -30,62 +30,80 @@ const FileView = () => {
     }, []);
 
     // Effect to trigger parsing when owner and fileId are available
+    // Dependencies for the effect
     useEffect(() => {
-        const triggerParse = async () => {
+        const fetchOrParseContent = async () => {
             if (!owner || !fileId) {
-                 console.log("Waiting for owner or fileId to trigger parse...");
-                 return; // Don't proceed if owner or fileId is missing
+                console.log("Waiting for owner or fileId to fetch/parse content...");
+                return;
             }
-
-            console.log(`Attempting to parse file ID: ${fileId} for owner: ${owner}`);
+    
             setIsLoading(true);
             setError('');
-            setParsedContent(null); // Clear previous content
-
+            setParsedContent(null);
+    
             try {
-                const result = await parseFileById(owner, fileId);
-                console.log("Parse API Result:", result);
-
-                // --- Handle Backend Response ---
-                // Success Case:
-                if (result && result.message && result.message.includes("stored successfully")) {
-                    setParsedContent({
-                         raw_text: result.raw_text || "",
-                         chunks: result.chunks || [],
-                         stats: result.stats || {}
-                    });
-                    // Update filename if backend provides it and it wasn't passed in state
-                    if (!filenameFromState && result.filename) {
-                         setFileDetails(prev => ({ ...prev, name: result.filename }));
+                // --- Step 1: Try to GET existing content ---
+                // Assume you create a getParsedContent(owner, fileId) utility function
+                console.log(`Attempting to fetch content for file ID: ${fileId}, owner: ${owner}`);
+                const existingContent = await parseFileById(owner, fileId);
+                console.log("Fetched existing content:", existingContent);
+    
+                setParsedContent({
+                    raw_text: existingContent.raw_text || "",
+                    chunks: existingContent.chunks || [],
+                    // Extract stats if returned by the new endpoint
+                    stats: existingContent.stats || {
+                         char_count: existingContent.raw_text?.length || 0, // Basic stats if not stored
+                         chunk_count: existingContent.chunks?.length || 0
                     }
-                // Already Parsed Case (adjust based on exact backend message):
-                } else if (result && result.message && result.message.includes("already been parsed")) {
-                     // Option 1: Show message
-                     // setError(`Note: This file (ID: ${fileId}) has already been parsed previously.`);
-                     // Option 2: Try to fetch existing parsed data (needs another API endpoint)
-                     // setError("File already parsed. Fetching existing data not yet implemented.");
-                     // Option 3 (if parse endpoint returns existing data on 'already parsed'):
-                     if (result.parsed_content) { // Assuming backend sends existing data
-                          setParsedContent(result.parsed_content);
-                          console.log("Displaying previously parsed content.");
-                     } else {
-                          setError(`File already parsed, but no existing content returned.`);
-                     }
-                // Error Case:
-                } else {
-                    setError(result?.detail || result?.message || `Failed to parse file ${fileId}. Unknown reason.`);
-                }
-            } catch (err) {
-                console.error("Error calling parseFileById:", err);
-                setError(err.message || `An unexpected error occurred while trying to parse file ${fileId}.`);
-            } finally {
+                });
                 setIsLoading(false);
+    
+            } catch (fetchError) {
+                 console.warn("Failed to fetch existing content:", fetchError);
+                // --- Step 2: If fetching fails (e.g., 404 Not Found), THEN try parsing ---
+                // Check if the error indicates 'Not Found' (customize based on your API util)
+                if (fetchError?.status === 404) {
+                     console.log(`Content not found for file ${fileId}, attempting to trigger parse...`);
+                     try {
+                         // Call the original parse endpoint
+                         const parseResult = await parseFileById(owner, fileId); // Your existing function
+                         console.log("Parse API Result:", parseResult);
+    
+                         if (parseResult && parseResult.message && parseResult.message.includes("stored successfully")) {
+                              setParsedContent({
+                                  raw_text: parseResult.raw_text || "",
+                                  chunks: parseResult.chunks || [],
+                                  stats: parseResult.stats || {}
+                              });
+                         } else if (parseResult && parseResult.message && parseResult.message.includes("already been parsed")) {
+                             // This case might mean a race condition or backend inconsistency
+                             // Maybe try fetching again, or show an appropriate message.
+                             setError("File was already parsed, but fetching failed initially. Please try refreshing.");
+                         } else {
+                             setError(parseResult?.detail || parseResult?.message || `Failed to parse file ${fileId}.`);
+                         }
+    
+                     } catch (parseError) {
+                         console.error("Error calling parseFileById:", parseError);
+                         setError(parseError.data?.detail || parseError.message || `An error occurred while trying to parse file ${fileId}.`);
+                     } finally {
+                         setIsLoading(false); // Stop loading after parse attempt
+                     }
+                } else {
+                     // Handle other errors from the fetch attempt
+                     setError(fetchError.data?.detail || fetchError.message || `An error occurred while fetching content for file ${fileId}.`);
+                     setIsLoading(false); // Stop loading on other fetch errors
+                }
             }
+            // Note: No finally { setIsLoading(false) } here, as it's handled within the catch/try blocks
         };
+    
+        fetchOrParseContent();
+    
+    }, [fileId, owner]); 
 
-        triggerParse();
-
-    }, [fileId, owner, filenameFromState]); // Dependencies for the effect
 
     return (
         <Box sx={{ p: 3 }}>

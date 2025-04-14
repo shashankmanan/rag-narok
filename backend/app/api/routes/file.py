@@ -115,10 +115,18 @@ async def parse_file(
     if existing_parse:
         # Decide behavior: return existing, allow re-parse, or raise error?
         # Option 1: Return indication it's already parsed
+        parsed_data = db.query(ParsedContent).filter(
+            ParsedContent.file_id == fileid,
+            ParsedContent.user_id == user.id  # Ensure user owns the parsed content
+        ).first()
         return {
-            "message": f"File ID {fileid} has already been parsed.",
-            "parsed_content_id": existing_parse.id
-            }
+        "file_id": parsed_data.file_id,
+        "user_id": parsed_data.user_id,
+        "raw_text": parsed_data.raw_text,
+        "chunks": parsed_data.chunks,
+        
+        "parsed_at": parsed_data.created_at 
+        }
         # Option 2: Raise conflict error
         # raise HTTPException(status_code=409, detail=f"File ID {fileid} has already been parsed.")
         # Option 3: Delete existing and re-parse (continue execution)
@@ -188,15 +196,12 @@ async def parse_file(
         raise HTTPException(status_code=500, detail=f"Failed to save parsed content to database: {str(e)}")
 
     return {
-        "message": "File parsed and content stored successfully",
-        "parsed_content_id": parsed_content.id,
-        "file_id": file_metadata.id,
-        "user_id": user.id,
-        "stats": { # Include stats similar to parser_main for consistency
-            "char_count": len(raw_text),
-            "chunk_count": len(chunks),
-            "avg_chunk_size": sum(len(c) for c in chunks) / len(chunks) if chunks else 0
-         }
+        "file_id": parsed_content.file_id,
+        "user_id": parsed_content.user_id,
+        "raw_text": parsed_content.raw_text,
+        "chunks": parsed_content.chunks,
+        "parsed_at": parsed_content.created_at
     }
+
 
 
