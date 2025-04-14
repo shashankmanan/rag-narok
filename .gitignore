@@ -3,4 +3,5 @@ backend/venv/Scripts
 __pycache__
 .env
 backend/app/api/.env
+.vscode
 
